@@ -1,4 +1,5 @@
 import os.path
+import os
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -8,6 +9,7 @@ from googleapiclient.errors import HttpError
 
 
 # If modifying these scopes, delete the file token.json.
+# https://developers.google.cn/gmail/api/auth/scopes?hl=en#:~:text=Gmail%20API%20scopes%20To%20define%20the%20level%20of,data%20it%20accesses%2C%20and%20the%20level%20of%20access.
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 
@@ -24,10 +26,10 @@ def get_message_details(service, message_id):
     return {"sender": sender, "subject": subject}
 
 
-def get_unique_senders(service, message):
+def get_unique_senders(service, messages_list):
     unique_senders = set()
 
-    for mess in message:
+    for mess in messages_list:
         message_data = (
             service.users()
             .messages()
@@ -64,16 +66,25 @@ def main():
         # Create gmail api client
         service = build("gmail", "v1", credentials=creds)
 
-        message = service.users().messages().list(userId="me").execute().get("messages")
+        messages = (
+            service.users().messages().list(userId="me").execute().get("messages")
+        )
+        messages_list = []
 
-        # messages = []
         # Getting sender and subject of the message
-        # for mess in message:
-        #     message_id = mess["id"]
-        #     message_details = get_message_details(service, message_id)
-        #     messages.append(message_details)
+        for mess in messages:
+            message_id = mess["id"]
+            message_details = get_message_details(service, message_id)
+            messages_list.append(message_details)
+            print(message_details)
 
-        print("Unique senders:", get_unique_senders(service, message))
+        print("-------------------------------------------------------")
+        print("Unique senders:", get_unique_senders(service, messages))
+
+        # Getting project root directory
+        cwd = os.getcwd()
+        # Deleting token.json file after successful execution
+        os.remove(f"{cwd}/token.json")
 
     except HttpError as error:
         print(f"An error occurred: {error}")
