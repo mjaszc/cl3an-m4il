@@ -2,3 +2,6 @@ credentials.json
 token.json
 setup.cfg
 __pycache__/
+.venv/
+mypy.ini
+.mypy_cache/

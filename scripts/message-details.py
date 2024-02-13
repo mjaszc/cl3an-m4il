@@ -1,10 +1,10 @@
-import os.path
 import os
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.discovery import Resource
 from googleapiclient.errors import HttpError
 
 
@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 
-def get_message_details(service, message_id):
+def get_message_details(service: Resource, message_id: str):
     message = (
         service.users()
         .messages()
@@ -26,7 +26,7 @@ def get_message_details(service, message_id):
     return {"sender": sender, "subject": subject}
 
 
-def get_unique_senders(service, messages_list):
+def get_unique_senders(service: Resource, messages_list: list) -> set[str]:
     unique_senders = set()
 
     for mess in messages_list:
