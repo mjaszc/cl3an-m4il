@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 
-def get_message_details(service: Resource, message_id: str):
+def get_message_details(service: Resource, message_id: str) -> dict[str, str]:
     message = (
         service.users()
         .messages()
@@ -76,6 +76,7 @@ def main():
             message_id = mess["id"]
             message_details = get_message_details(service, message_id)
             messages_list.append(message_details)
+            print(type(message_details))
             print(message_details)
 
         print("-------------------------------------------------------")

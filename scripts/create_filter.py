@@ -6,10 +6,14 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from message_details import get_unique_senders
 
 # If modifying these scopes, delete the file token.json.
 # https://developers.google.cn/gmail/api/auth/scopes?hl=en#:~:text=Gmail%20API%20scopes%20To%20define%20the%20level%20of,data%20it%20accesses%2C%20and%20the%20level%20of%20access.
-SCOPES = ["https://www.googleapis.com/auth/gmail.settings.basic"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.settings.basic",
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
 
 
 def main():
@@ -34,10 +38,14 @@ def main():
         # Create gmail api client
         service = build("gmail", "v1", credentials=creds)
 
+        messages = (
+            service.users().messages().list(userId="me").execute().get("messages")
+        )
+
         # Change filter criteria
         # https://developers.google.com/gmail/api/reference/rest/v1/users.settings.filters#Filter
         filter_content = {
-            "criteria": {"from": "example@gmail.com"},
+            "criteria": {"from": "example123@gmail.com"},
             "action": {
                 "addLabelIds": ["TRASH"],
                 "removeLabelIds": ["INBOX"],
@@ -53,6 +61,8 @@ def main():
         )
 
         print(f'Created filter with id: {result.get("id")}')
+
+        print("Unique senders:", get_unique_senders(service, messages))
 
         # Getting project root directory
         cwd = os.getcwd()
