@@ -30,7 +30,13 @@ def mark_senders(senders_list: list[str]) -> list[str]:
     """
     marked_senders = []
     for item in senders_list:
-        mark = input(f"Do you want to mark '{item}'? (y/n): ").lower()
+        # The function now ensures that only valid input ("y" or "n") is accepted before proceeding.
+        while True:
+            mark = input(f"Do you want to mark '{item}'? (y/n): ").lower()
+            if mark in ("y", "n"):
+                break
+            print("Invalid input. Please enter 'y' or 'n'.")
+
         if mark == "y":
             marked_senders.append(item)
 
