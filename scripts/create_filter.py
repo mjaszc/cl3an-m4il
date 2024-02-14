@@ -1,4 +1,5 @@
 import os.path
+import re
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -6,7 +7,8 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from message_details import get_unique_senders
+import message_details
+
 
 # If modifying these scopes, delete the file token.json.
 # https://developers.google.cn/gmail/api/auth/scopes?hl=en#:~:text=Gmail%20API%20scopes%20To%20define%20the%20level%20of,data%20it%20accesses%2C%20and%20the%20level%20of%20access.
@@ -14,6 +16,44 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.settings.basic",
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
+
+
+def mark_senders(senders_list: list[str]) -> list[str]:
+    """
+    This function interactively marks senders for further processing.
+
+    Args:
+        senders_list: A list of sender names and addresses.
+
+    Returns:
+        A list containing only the marked senders.
+    """
+    marked_senders = []
+    for item in senders_list:
+        mark = input(f"Do you want to mark '{item}'? (y/n): ").lower()
+        if mark == "y":
+            marked_senders.append(item)
+
+    return marked_senders
+
+
+def extract_emails(senders: set[str]) -> str:
+    """
+    Extracts email addresses from a set of strings and joins them with "OR".
+
+    Args:
+        senders: A set of strings containing sender name and addresse.
+
+    Returns:
+        A string containing the extracted email addresses joined with "OR".
+    """
+    emails = []
+    for text in senders:
+        email_match = re.search(r"<(.*?)>", text)  # Extract email within angle brackets
+        if email_match:
+            email = email_match.group(1)
+            emails.append(email)
+    return " OR ".join(emails)
 
 
 def main():
@@ -38,14 +78,18 @@ def main():
         # Create gmail api client
         service = build("gmail", "v1", credentials=creds)
 
+        # Get emails
         messages = (
             service.users().messages().list(userId="me").execute().get("messages")
         )
 
+        senders = mark_senders(message_details.get_unique_senders(service, messages))
+        emails = extract_emails(senders)
+
         # Change filter criteria
         # https://developers.google.com/gmail/api/reference/rest/v1/users.settings.filters#Filter
         filter_content = {
-            "criteria": {"from": "example123@gmail.com"},
+            "criteria": {"from": f"{emails}"},
             "action": {
                 "addLabelIds": ["TRASH"],
                 "removeLabelIds": ["INBOX"],
@@ -61,8 +105,6 @@ def main():
         )
 
         print(f'Created filter with id: {result.get("id")}')
-
-        print("Unique senders:", get_unique_senders(service, messages))
 
         # Getting project root directory
         cwd = os.getcwd()

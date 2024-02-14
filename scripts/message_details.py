@@ -14,6 +14,16 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
 
 def get_message_details(service: Resource, message_id: str) -> dict[str, str]:
+    """
+    This function retrieves the details of a specific email message from a Gmail inbox.
+
+    Args:
+        service: An authorized Gmail API service object.
+        message_id: The ID of the message to retrieve details for.
+
+    Returns:
+        A dictionary containing the sender email address and subject of the message.
+    """
     message = (
         service.users()
         .messages()
@@ -27,6 +37,16 @@ def get_message_details(service: Resource, message_id: str) -> dict[str, str]:
 
 
 def get_unique_senders(service: Resource, messages_list: list) -> set[str]:
+    """
+    This function finds all unique sender email addresses from a list of message IDs.
+
+    Args:
+        service: An authorized Gmail API service object.
+        messages_list: A list of dictionaries containing message IDs (e.g., from a Gmail API response).
+
+    Returns:
+        A set containing all unique sender email addresses found in the messages.
+    """
     unique_senders = set()
 
     for mess in messages_list:
@@ -76,7 +96,6 @@ def main():
             message_id = mess["id"]
             message_details = get_message_details(service, message_id)
             messages_list.append(message_details)
-            print(type(message_details))
             print(message_details)
 
         print("-------------------------------------------------------")
