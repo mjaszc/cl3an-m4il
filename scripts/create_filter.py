@@ -5,9 +5,8 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.discovery import Resource
 from googleapiclient.errors import HttpError
-
-import message_details
 
 
 # If modifying these scopes, delete the file token.json.
@@ -16,6 +15,34 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.settings.basic",
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
+
+
+def get_unique_senders(service: Resource, messages_list: list) -> set[str]:
+    """
+    This function finds all unique sender email addresses from a list of message IDs.
+
+    Args:
+        service: An authorized Gmail API service object.
+        messages_list: A list of dictionaries containing message IDs (e.g., from a Gmail API response).
+
+    Returns:
+        A set containing all unique sender email addresses found in the messages.
+    """
+    unique_senders = set()
+
+    for mess in messages_list:
+        message_data = (
+            service.users()
+            .messages()
+            .get(userId="me", id=mess["id"], format="full")
+            .execute()
+        )
+        for header in message_data["payload"]["headers"]:
+            if header["name"] == "From":
+                if header["value"] not in unique_senders:
+                    unique_senders.add(header["value"])
+
+    return unique_senders
 
 
 def mark_senders(senders_list: list[str]) -> list[str]:
@@ -89,7 +116,7 @@ def main():
             service.users().messages().list(userId="me").execute().get("messages")
         )
 
-        senders = mark_senders(message_details.get_unique_senders(service, messages))
+        senders = mark_senders(get_unique_senders(service, messages))
         emails = extract_emails(senders)
 
         # Change filter criteria

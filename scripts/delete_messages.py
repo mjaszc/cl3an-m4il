@@ -8,13 +8,66 @@ from googleapiclient.discovery import build
 from googleapiclient.discovery import Resource
 from googleapiclient.errors import HttpError
 
-import message_details
-import create_filter
 
+# If modifying these scopes, delete the file token.json.
+# https://developers.google.cn/gmail/api/auth/scopes?hl=en#:~:text=Gmail%20API%20scopes%20To%20define%20the%20level%20of,data%20it%20accesses%2C%20and%20the%20level%20of%20access.
 SCOPES = [
     "https://mail.google.com/",
     "https://www.googleapis.com/auth/gmail.readonly",
 ]
+
+
+def get_unique_senders(service: Resource, messages_list: list) -> set[str]:
+    """
+    This function finds all unique sender email addresses from a list of message IDs.
+
+    Args:
+        service: An authorized Gmail API service object.
+        messages_list: A list of dictionaries containing message IDs (e.g., from a Gmail API response).
+
+    Returns:
+        A set containing all unique sender email addresses found in the messages.
+    """
+    unique_senders = set()
+
+    for mess in messages_list:
+        message_data = (
+            service.users()
+            .messages()
+            .get(userId="me", id=mess["id"], format="full")
+            .execute()
+        )
+        for header in message_data["payload"]["headers"]:
+            if header["name"] == "From":
+                if header["value"] not in unique_senders:
+                    unique_senders.add(header["value"])
+
+    return unique_senders
+
+
+def mark_senders(senders_list: list[str]) -> list[str]:
+    """
+    This function interactively marks senders for further processing.
+
+    Args:
+        senders_list: A list of sender names and addresses.
+
+    Returns:
+        A list containing only the marked senders.
+    """
+    marked_senders = []
+    for item in senders_list:
+        # The function now ensures that only valid input ("y" or "n") is accepted before proceeding.
+        while True:
+            mark = input(f"Do you want to mark '{item}'? (y/n): ").lower()
+            if mark in ("y", "n"):
+                break
+            print("Invalid input. Please enter 'y' or 'n'.")
+
+        if mark == "y":
+            marked_senders.append(item)
+
+    return marked_senders
 
 
 def get_marked_senders_msg_id(
@@ -96,16 +149,14 @@ def main():
             service.users().messages().list(userId="me").execute().get("messages")
         )
 
-        senders = create_filter.mark_senders(
-            message_details.get_unique_senders(service, messages)
-        )
+        senders = mark_senders(get_unique_senders(service, messages))
 
-        print(get_marked_senders_msg_id(service, messages, senders))
+        get_marked_senders_msg_id(service, messages, senders)
 
         # Getting project root directory
-        # cwd = os.getcwd()
+        cwd = os.getcwd()
         # Deleting token.json file after successful execution
-        # os.remove(f"{cwd}/token.json")
+        os.remove(f"{cwd}/token.json")
 
     except HttpError as error:
         print(f"An error occurred: {error}")
