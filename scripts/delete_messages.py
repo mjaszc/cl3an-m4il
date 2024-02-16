@@ -14,6 +14,7 @@ from googleapiclient.errors import HttpError
 SCOPES = [
     "https://mail.google.com/",
     "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.modify",
 ]
 
 
@@ -104,6 +105,22 @@ def get_marked_senders_msg_id(
     return unique_senders_msgs_id
 
 
+def trash_msgs_except_star_label(service: Resource, message_ids: list[str]) -> None:
+    """Send to trash messages from Gmail except those with the STARRED label.
+
+    Args:
+        service: An authorized Gmail API service instance.
+        message_ids: A list of message IDs to send to trash.
+    """
+    for message_id in message_ids:
+        message = service.users().messages().get(userId="me", id=message_id).execute()
+        if "STARRED" not in message["labelIds"]:
+            service.users().messages().trash(userId="me", id=message_id).execute()
+            print(f"Message {message_id} send to trash successfully.")
+        else:
+            print(f"Skipping message {message_id} as it is starred.")
+
+
 def extract_emails(senders: set[str]) -> list[str]:
     """
     Extracts email addresses from a set of strings.
@@ -149,9 +166,13 @@ def main():
             service.users().messages().list(userId="me").execute().get("messages")
         )
 
-        senders = mark_senders(get_unique_senders(service, messages))
+        marked_senders_list = mark_senders(get_unique_senders(service, messages))
 
-        get_marked_senders_msg_id(service, messages, senders)
+        marked_senders_id_msg_list = get_marked_senders_msg_id(
+            service, messages, marked_senders_list
+        )
+
+        trash_msgs_except_star_label(service, marked_senders_id_msg_list)
 
         # Getting project root directory
         cwd = os.getcwd()
