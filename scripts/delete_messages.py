@@ -18,84 +18,22 @@ SCOPES = [
 ]
 
 
-def get_unique_senders(service: Resource, messages_list: list) -> set[str]:
-    """
-    Extracts and returns a set of unique sender email addresses from the provided list of messages.
+def get_messages_id_list(service: Resource, messages_list: list) -> list[str]:
+    """Extracts a list of message IDs from a provided list of messages.
 
     Args:
-        service: The Gmail service object.
-        messages_list: A list of message objects.
+        service: An authorized Gmail API service instance
+        messages_list: A list of message dictionaries obtained from the API.
 
     Returns:
-        A set containing the unique sender email addresses.
+        A list of message IDs corresponding to the provided messages.
     """
-    unique_senders = set()
-
-    message_ids = [message["id"] for message in messages_list]
-    for message_id in message_ids:
-        message_data = (
-            service.users().messages().get(userId="me", id=message_id).execute()
-        )
-        for header in message_data["payload"]["headers"]:
-            if header["name"] == "From":
-                unique_senders.add(header["value"])
-    return unique_senders
-
-
-def mark_senders(senders_list: list[str]) -> list[str]:
-    """
-    This function interactively marks senders for further processing.
-
-    Args:
-        senders_list: A list of sender names and addresses.
-
-    Returns:
-        A list containing only the marked senders.
-    """
-    marked_senders = []
-    for item in senders_list:
-        # The function now ensures that only valid input ("y" or "n") is accepted before proceeding.
-        while True:
-            mark = input(f"Do you want to mark '{item}'? (y/n): ").lower()
-            if mark in ("y", "n"):
-                break
-            print("Invalid input. Please enter 'y' or 'n'.")
-
-        if mark == "y":
-            marked_senders.append(item)
-
-    return marked_senders
-
-
-def get_marked_senders_msg_id(
-    service: Resource, messages_list: list, senders: set[str]
-) -> list[str]:
-    """
-    This function gets a list of message IDs from the given list
-    that were sent by one of the senders in the senders list.
-
-    Args:
-        service: The Gmail service object.
-        messages_list: A list of message IDs.
-        senders: A set of email addresses.
-
-    Returns:
-        A list of message IDs.
-    """
-    unique_senders_msgs_id = []
+    messages_id = []
 
     for message in messages_list:
-        message_data = (
-            service.users().messages().get(userId="me", id=message["id"]).execute()
-        )
+        messages_id.append(message["id"])
 
-        for header in message_data["payload"]["headers"]:
-            if header["name"] == "From":
-                # Check if the iterated item sender's email address is in the senders list.
-                if header["value"] in senders:
-                    unique_senders_msgs_id.append(message_data["id"])
-
-    return unique_senders_msgs_id
+    return messages_id
 
 
 def trash_msgs_except_star_label(service: Resource, message_ids: list[str]) -> None:
@@ -165,13 +103,9 @@ def main():
                 .get("messages")
             )
 
-            marked_senders_list = mark_senders(get_unique_senders(service, messages))
-
-            marked_senders_msg_list = get_marked_senders_msg_id(
-                service, messages, marked_senders_list
+            trash_msgs_except_star_label(
+                service, get_messages_id_list(service, messages)
             )
-
-            trash_msgs_except_star_label(service, marked_senders_msg_list)
 
             # Check for the presence of a next page token
             # lastest message on a page contains information does next page exists
