@@ -20,29 +20,25 @@ SCOPES = [
 
 def get_unique_senders(service: Resource, messages_list: list) -> set[str]:
     """
-    This function finds all unique sender email addresses from a list of message IDs.
+    Extracts and returns a set of unique sender email addresses from the provided list of messages.
 
     Args:
-        service: An authorized Gmail API service object.
-        messages_list: A list of dictionaries containing message IDs (e.g., from a Gmail API response).
+        service: The Gmail service object.
+        messages_list: A list of message objects.
 
     Returns:
-        A set containing all unique sender email addresses found in the messages.
+        A set containing the unique sender email addresses.
     """
     unique_senders = set()
 
-    for mess in messages_list:
+    message_ids = [message["id"] for message in messages_list]
+    for message_id in message_ids:
         message_data = (
-            service.users()
-            .messages()
-            .get(userId="me", id=mess["id"], format="full")
-            .execute()
+            service.users().messages().get(userId="me", id=message_id).execute()
         )
         for header in message_data["payload"]["headers"]:
             if header["name"] == "From":
-                if header["value"] not in unique_senders:
-                    unique_senders.add(header["value"])
-
+                unique_senders.add(header["value"])
     return unique_senders
 
 
@@ -72,31 +68,28 @@ def mark_senders(senders_list: list[str]) -> list[str]:
 
 
 def get_marked_senders_msg_id(
-    service: Resource, messages_list: list, senders: list
+    service: Resource, messages_list: list, senders: set[str]
 ) -> list[str]:
     """
-    Returns a list of message IDs from the given list that were sent by one of the senders in the senders list.
+    This function gets a list of message IDs from the given list
+    that were sent by one of the senders in the senders list.
 
     Args:
         service: The Gmail service object.
         messages_list: A list of message IDs.
-        senders: A list of email addresses.
+        senders: A set of email addresses.
 
     Returns:
         A list of message IDs.
     """
     unique_senders_msgs_id = []
 
-    for mess in messages_list:
+    for message in messages_list:
         message_data = (
-            service.users()
-            .messages()
-            .get(userId="me", id=mess["id"], format="full")
-            .execute()
+            service.users().messages().get(userId="me", id=message["id"]).execute()
         )
 
         for header in message_data["payload"]["headers"]:
-
             if header["name"] == "From":
                 # Check if the iterated item sender's email address is in the senders list.
                 if header["value"] in senders:
@@ -126,7 +119,7 @@ def extract_emails(senders: set[str]) -> list[str]:
     Extracts email addresses from a set of strings.
 
     Args:
-        senders: A set of strings containing sender name and addresse.
+        senders: A set of strings containing sender name and addresses.
 
     Returns:
         A list containing the extracted email addresses.
@@ -161,18 +154,32 @@ def main():
     try:
         # Create gmail api client
         service = build("gmail", "v1", credentials=creds)
+        page_token = None
 
-        messages = (
-            service.users().messages().list(userId="me").execute().get("messages")
-        )
+        while True:
+            messages = (
+                service.users()
+                .messages()
+                .list(userId="me", maxResults=500, pageToken=page_token)
+                .execute()
+                .get("messages")
+            )
 
-        marked_senders_list = mark_senders(get_unique_senders(service, messages))
+            marked_senders_list = mark_senders(get_unique_senders(service, messages))
 
-        marked_senders_id_msg_list = get_marked_senders_msg_id(
-            service, messages, marked_senders_list
-        )
+            marked_senders_msg_list = get_marked_senders_msg_id(
+                service, messages, marked_senders_list
+            )
 
-        trash_msgs_except_star_label(service, marked_senders_id_msg_list)
+            trash_msgs_except_star_label(service, marked_senders_msg_list)
+
+            # Check for the presence of a next page token
+            # lastest message on a page contains information does next page exists
+            # if page_token does not exist, sets token to 'None'
+            page_token = messages[-1].get("nextPageToken", None)
+
+            if not page_token:
+                break
 
         # Getting project root directory
         cwd = os.getcwd()
