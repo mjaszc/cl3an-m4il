@@ -70,7 +70,7 @@ def mark_senders(senders_list: list[str]) -> list[str]:
     return marked_senders
 
 
-def extract_emails(senders: set[str]) -> str:
+def extract_emails(senders: set[str]) -> list[str]:
     """
     Extracts email addresses from a set of strings and joins them with "OR".
 
@@ -86,7 +86,38 @@ def extract_emails(senders: set[str]) -> str:
         if email_match:
             email = email_match.group(1)
             emails.append(email)
-    return " OR ".join(emails)
+    return emails
+
+
+def identify_unfiltered_emails(service: Resource, email_list: list[str]) -> list[str]:
+    """
+    Identifies emails from a provided list that are not present in any user-defined filters.
+
+    Args:
+        service: An authorized Gmail API service object.
+        email_list: A list of email strings.
+
+    Returns:
+        A list of email addresses that are not found in any filters.
+    """
+    filters_list = service.users().settings().filters().list(userId="me").execute()
+
+    unfiltered_emails = []
+
+    if "filter" in filters_list:
+        for email in email_list:
+            for filter in filters_list["filter"]:
+                # Check if email matches the filter criteria
+                if email in filter["criteria"]["from"]:
+                    break
+            else:
+                unfiltered_emails.append(email)
+    else:
+        # Add all emails to unfiltered list if no filters exist
+        print("No filters found, all emails considered unfiltered.")
+        unfiltered_emails.extend(email_list)
+
+    return " OR ".join(unfiltered_emails)
 
 
 def main():
@@ -110,19 +141,35 @@ def main():
     try:
         # Create gmail api client
         service = build("gmail", "v1", credentials=creds)
+        page_token = None
 
         # Get emails
         messages = (
-            service.users().messages().list(userId="me").execute().get("messages")
+            service.users()
+            .messages()
+            .list(userId="me", maxResults=250, pageToken=page_token)
+            .execute()
+            .get("messages")
         )
 
-        senders = mark_senders(get_unique_senders(service, messages))
-        emails = extract_emails(senders)
+        while True:
+            senders = mark_senders(get_unique_senders(service, messages))
+            emails = extract_emails(senders)
+
+            unfiltered_emails = identify_unfiltered_emails(service, emails)
+
+            page_token = messages[-1].get("nextPageToken", None)
+
+            # Check for the presence of a next page token
+            # lastest message on a page contains information does next page exists
+            # if page_token does not exist, sets token to 'None'
+            if not page_token:
+                break
 
         # Change filter criteria
         # https://developers.google.com/gmail/api/reference/rest/v1/users.settings.filters#Filter
         filter_content = {
-            "criteria": {"from": f"{emails}"},
+            "criteria": {"from": f"{unfiltered_emails}"},
             "action": {
                 "addLabelIds": ["TRASH"],
                 "removeLabelIds": ["INBOX"],
@@ -140,9 +187,9 @@ def main():
         print(f'Created filter with id: {result.get("id")}')
 
         # Getting project root directory
-        cwd = os.getcwd()
+        # cwd = os.getcwd()
         # Deleting token.json file after successful execution
-        os.remove(f"{cwd}/token.json")
+        # os.remove(f"{cwd}/token.json")
 
     except HttpError as error:
         print(f"An error occurred: {error}")

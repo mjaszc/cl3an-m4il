@@ -94,15 +94,15 @@ def main():
         service = build("gmail", "v1", credentials=creds)
         page_token = None
 
-        while True:
-            messages = (
-                service.users()
-                .messages()
-                .list(userId="me", maxResults=500, pageToken=page_token)
-                .execute()
-                .get("messages")
-            )
+        messages = (
+            service.users()
+            .messages()
+            .list(userId="me", maxResults=250, pageToken=page_token)
+            .execute()
+            .get("messages")
+        )
 
+        while True:
             trash_msgs_except_star_label(
                 service, get_messages_id_list(service, messages)
             )
@@ -116,9 +116,9 @@ def main():
                 break
 
         # Getting project root directory
-        cwd = os.getcwd()
+        # cwd = os.getcwd()
         # Deleting token.json file after successful execution
-        os.remove(f"{cwd}/token.json")
+        # os.remove(f"{cwd}/token.json")
 
     except HttpError as error:
         print(f"An error occurred: {error}")
